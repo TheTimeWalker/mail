@@ -215,7 +215,7 @@ export default {
 .multiselect-header-leave-active,
 .list-enter-active,
 .list-leave-active {
-	transition: all var(--animation-quick);
+	transition: all var(--animation-slow);
 }
 
 .multiselect-header-enter,
