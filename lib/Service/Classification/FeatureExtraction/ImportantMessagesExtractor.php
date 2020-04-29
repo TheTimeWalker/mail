@@ -23,50 +23,44 @@ declare(strict_types=1);
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace OCA\Mail\Service\Classification;
+namespace OCA\Mail\Service\Classification\FeatureExtraction;
 
 use OCA\Mail\Account;
-use OCA\Mail\Address;
 use OCA\Mail\Db\Mailbox;
-use OCA\Mail\Db\MailboxMapper;
-use OCA\Mail\Db\Message;
 use OCA\Mail\Db\StatisticsDao;
-use OCP\AppFramework\Db\DoesNotExistException;
-use OCP\DB\QueryBuilder\IQueryBuilder;
-use OCP\IDBConnection;
+use function array_reduce;
 
-class OftenImportantSenderClassifier extends AClassifier {
-	use SafeRatio;
+class ImportantMessagesExtractor implements IExtractor {
 
-	/** @var MailboxMapper */
-	private $mailboxMapper;
+	/** @var int */
+	private $incomingMessagesTotal = 0;
+
+	/** @var Mailbox[] */
+	private $incomingMailboxes = [];
 
 	/** @var StatisticsDao */
 	private $statisticsDao;
 
-	public function __construct(MailboxMapper $mailboxMapper,
-								StatisticsDao $statisticsDao) {
-		$this->mailboxMapper = $mailboxMapper;
+	public function __construct(StatisticsDao $statisticsDao) {
 		$this->statisticsDao = $statisticsDao;
 	}
 
-	public function isImportant(Account $account, Mailbox $mailbox, Message $message): bool {
-		$sender = $message->getTo()->first();
-		if ($sender === null) {
-			return false;
-		}
+	public function initialize(Account $account, array $incomingMailboxes, array $outgoingMailboxes): bool {
+		$this->incomingMailboxes = $incomingMailboxes;
+		$this->incomingMessagesTotal = array_reduce($incomingMailboxes, function (int $carry, Mailbox $mailbox) {
+			return $carry + $this->statisticsDao->getMessagesTotal($mailbox);
+		}, 0);
 
-		try {
-			$mb = $this->mailboxMapper->findSpecial($account, 'inbox');
-		} catch (DoesNotExistException $e) {
-			return false;
-		}
+		// This extractor is only applicable if there are incoming messages
+		return $this->incomingMessagesTotal > 0;
+	}
 
-		return $this->greater(
-			$this->statisticsDao->getNrOfImportantMessages($mb, $sender->getEmail()),
-			$this->statisticsDao->getNumberOfMessages($mb, $sender->getEmail()),
-			0.3
-		);
+	public function extract(string $email): float {
+		$cnt = array_reduce($this->incomingMailboxes, function (int $carry, Mailbox $mailbox) use ($email) {
+			return $carry + $this->statisticsDao->getNrOfImportantMessages($mailbox, $email);
+		}, 0);
+
+		return $cnt / $this->incomingMessagesTotal;
 	}
 
 }

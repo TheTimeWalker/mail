@@ -25,16 +25,11 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Command;
 
-use OCA\Mail\Account;
-use OCA\Mail\Exception\IncompleteSyncException;
-use OCA\Mail\Exception\ServiceException;
-use OCA\Mail\IMAP\MailboxSync;
 use OCA\Mail\Service\AccountService;
-use OCA\Mail\Service\Sync\ImapToDbSynchronizer;
+use OCA\Mail\Service\Classification\ImportanceClassifier;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use function memory_get_peak_usage;
 
@@ -44,10 +39,15 @@ class TrainAccount extends Command {
 	/** @var AccountService */
 	private $accountService;
 
-	public function __construct(AccountService $service) {
+	/** @var ImportanceClassifier */
+	private $classifier;
+
+	public function __construct(AccountService $service,
+								ImportanceClassifier $classifier) {
 		parent::__construct();
 
 		$this->accountService = $service;
+		$this->classifier = $classifier;
 	}
 
 	/**
@@ -66,6 +66,7 @@ class TrainAccount extends Command {
 		$accountId = (int)$input->getArgument(self::ARGUMENT_ACCOUNT_ID);
 
 		$account = $this->accountService->findById($accountId);
+		$this->classifier->train($account);
 
 		$mbs = (int)(memory_get_peak_usage() / 1024 / 1024);
 		$output->writeln('<info>' . $mbs . 'MB of memory used</info>');

@@ -23,50 +23,46 @@ declare(strict_types=1);
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace OCA\Mail\Service\Classification;
+namespace OCA\Mail\Service\Classification\FeatureExtraction;
+
 
 use OCA\Mail\Account;
-use OCA\Mail\Address;
 use OCA\Mail\Db\Mailbox;
-use OCA\Mail\Db\MailboxMapper;
-use OCA\Mail\Db\Message;
 use OCA\Mail\Db\StatisticsDao;
-use OCP\AppFramework\Db\DoesNotExistException;
-use OCP\DB\QueryBuilder\IQueryBuilder;
-use OCP\IDBConnection;
+use function array_reduce;
 
-class OftenImportantSenderClassifier extends AClassifier {
-	use SafeRatio;
+class RepliedMessagesExtractor implements IExtractor {
 
-	/** @var MailboxMapper */
-	private $mailboxMapper;
+	/** @var Mailbox[] */
+	private $incomingMailboxes = [];
 
 	/** @var StatisticsDao */
 	private $statisticsDao;
 
-	public function __construct(MailboxMapper $mailboxMapper,
-								StatisticsDao $statisticsDao) {
-		$this->mailboxMapper = $mailboxMapper;
+	public function __construct(StatisticsDao $statisticsDao) {
 		$this->statisticsDao = $statisticsDao;
 	}
 
-	public function isImportant(Account $account, Mailbox $mailbox, Message $message): bool {
-		$sender = $message->getTo()->first();
-		if ($sender === null) {
-			return false;
+	public function initialize(Account $account, array $incomingMailboxes, array $outgoingMailboxes): bool {
+		$this->incomingMailboxes = $incomingMailboxes;
+
+		return true;
+	}
+
+	public function extract(string $email): float {
+		$total = array_reduce($this->incomingMailboxes, function (int $carry, Mailbox $mailbox) use ($email) {
+			return $carry + $this->statisticsDao->getNumberOfMessages($mailbox, $email);
+		}, 0);
+		$read = array_reduce($this->incomingMailboxes, function (int $carry, Mailbox $mailbox) use ($email) {
+			return $carry + $this->statisticsDao->getNrOfRepliedMessages($mailbox, $email);
+		}, 0);
+
+		// Prevent division by zero and just say no emails are replied
+		if ($total === 0) {
+			return 0;
 		}
 
-		try {
-			$mb = $this->mailboxMapper->findSpecial($account, 'inbox');
-		} catch (DoesNotExistException $e) {
-			return false;
-		}
-
-		return $this->greater(
-			$this->statisticsDao->getNrOfImportantMessages($mb, $sender->getEmail()),
-			$this->statisticsDao->getNumberOfMessages($mb, $sender->getEmail()),
-			0.3
-		);
+		return $read / $total;
 	}
 
 }
