@@ -27,16 +27,19 @@ namespace OCA\Mail\Service\Classification\FeatureExtraction;
 
 use OCA\Mail\Account;
 use OCA\Mail\Db\Mailbox;
+use OCA\Mail\Db\Message;
 use OCA\Mail\Db\StatisticsDao;
+use function array_map;
 use function array_reduce;
+use function array_unique;
 
 class ImportantMessagesExtractor implements IExtractor {
 
 	/** @var int */
-	private $incomingMessagesTotal = 0;
+	private $totalMessages = 0;
 
-	/** @var Mailbox[] */
-	private $incomingMailboxes = [];
+	/** @var int[] */
+	private $flaggedMessages = [];
 
 	/** @var StatisticsDao */
 	private $statisticsDao;
@@ -45,22 +48,22 @@ class ImportantMessagesExtractor implements IExtractor {
 		$this->statisticsDao = $statisticsDao;
 	}
 
-	public function initialize(Account $account, array $incomingMailboxes, array $outgoingMailboxes): bool {
-		$this->incomingMailboxes = $incomingMailboxes;
-		$this->incomingMessagesTotal = array_reduce($incomingMailboxes, function (int $carry, Mailbox $mailbox) {
-			return $carry + $this->statisticsDao->getMessagesTotal($mailbox);
-		}, 0);
+	public function prepare(Account $account,
+							array $incomingMailboxes,
+							array $outgoingMailboxes,
+							array $messages): bool {
+		$senders = array_unique(array_map(function (Message $message) {
+			return $message->getFrom()->first()->getEmail();
+		}, $messages));
+		$this->totalMessages = $this->statisticsDao->getNumberOfMessagesGrouped($incomingMailboxes, $senders);
+		$this->flaggedMessages = $this->statisticsDao->getNumberOfMessagesWithFlagGrouped($incomingMailboxes, 'important', $senders);
 
 		// This extractor is only applicable if there are incoming messages
-		return $this->incomingMessagesTotal > 0;
+		return $this->totalMessages > 0;
 	}
 
 	public function extract(string $email): float {
-		$cnt = array_reduce($this->incomingMailboxes, function (int $carry, Mailbox $mailbox) use ($email) {
-			return $carry + $this->statisticsDao->getNrOfImportantMessages($mailbox, $email);
-		}, 0);
-
-		return $cnt / $this->incomingMessagesTotal;
+		return ($this->flaggedMessages[$email] ?? 0) / ($this->totalMessages[$email] ?? 0);
 	}
 
 }

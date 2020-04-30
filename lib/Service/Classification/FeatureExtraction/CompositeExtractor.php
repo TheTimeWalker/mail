@@ -51,11 +51,14 @@ class CompositeExtractor {
 		];
 	}
 
-	public function initialize(Account $account, array $incomingMailboxes, array $outgoingMailboxes): void {
+	public function prepare(Account $account,
+							array $incomingMailboxes,
+							array $outgoingMailboxes,
+							array $messages): void {
 		$this->applicableExtractors = array_filter(
 			$this->extractors,
-			function (IExtractor $extractor) use ($account, $incomingMailboxes, $outgoingMailboxes) {
-				return $extractor->initialize($account, $incomingMailboxes, $outgoingMailboxes);
+			function (IExtractor $extractor) use ($account, $incomingMailboxes, $outgoingMailboxes, $messages) {
+				return $extractor->prepare($account, $incomingMailboxes, $outgoingMailboxes, $messages);
 			}
 		);
 	}

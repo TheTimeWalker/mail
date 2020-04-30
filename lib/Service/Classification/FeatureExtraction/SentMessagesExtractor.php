@@ -28,40 +28,44 @@ namespace OCA\Mail\Service\Classification\FeatureExtraction;
 
 use OCA\Mail\Account;
 use OCA\Mail\Db\Mailbox;
+use OCA\Mail\Db\Message;
 use OCA\Mail\Db\StatisticsDao;
+use function array_map;
 use function array_reduce;
+use function array_unique;
 
 class SentMessagesExtractor implements IExtractor {
+
+	/** @var StatisticsDao */
+	private $statisticsDao;
 
 	/** @var int */
 	private $messagesSentTotal = 0;
 
-	/** @var Mailbox[] */
-	private $outgoingMailboxes = [];
-
-	/** @var StatisticsDao */
-	private $statisticsDao;
+	/** @var int[] */
+	private $messagesSent;
 
 	public function __construct(StatisticsDao $statisticsDao) {
 		$this->statisticsDao = $statisticsDao;
 	}
 
-	public function initialize(Account $account, array $incomingMailboxes, array $outgoingMailboxes): bool {
-		$this->outgoingMailboxes = $outgoingMailboxes;
-		$this->messagesSentTotal = array_reduce($outgoingMailboxes, function (int $carry, Mailbox $mailbox) {
-			return $carry + $this->statisticsDao->getMessagesTotal($mailbox);
-		}, 0);
+	public function prepare(Account $account,
+							array $incomingMailboxes,
+							array $outgoingMailboxes,
+							array $messages): bool {
+		$senders = array_unique(array_map(function (Message $message) {
+			return $message->getFrom()->first()->getEmail();
+		}, $messages));
+
+		$this->messagesSentTotal = $this->statisticsDao->getMessagesTotal(...$outgoingMailboxes);
+		$this->messagesSent = $this->statisticsDao->getMessagesSentToGrouped($outgoingMailboxes, $senders);
 
 		// This extractor is only applicable if there are sent messages
 		return $this->messagesSentTotal > 0;
 	}
 
 	public function extract(string $email): float {
-		$cnt = array_reduce($this->outgoingMailboxes, function (int $carry, Mailbox $mailbox) use ($email) {
-			return $carry + $this->statisticsDao->getMessagesSentTo($mailbox, $email);
-		}, 0);
-
-		return $cnt / $this->messagesSentTotal;
+		return ($this->messagesSent[$email] ?? 0) / $this->messagesSentTotal;
 	}
 
 }

@@ -71,7 +71,7 @@ class ImportanceClassifier {
 	/**
 	 * The maximum number of data sets to train the classifier with
 	 */
-	private const MAX_TRAINING_SET_SIZE = 100;
+	private const MAX_TRAINING_SET_SIZE = 1000;
 
 	/** @var MailboxMapper */
 	private $mailboxMapper;
@@ -171,7 +171,7 @@ class ImportanceClassifier {
 											  array $incomingMailboxes,
 											  array $outgoingMailboxes,
 											  array $messages): array {
-		$this->extractor->initialize($account, $incomingMailboxes, $outgoingMailboxes);
+		$this->extractor->prepare($account, $incomingMailboxes, $outgoingMailboxes, $messages);
 
 		return array_map(function (Message $message) {
 			$sender = $message->getFrom()->first();
@@ -182,6 +182,7 @@ class ImportanceClassifier {
 			return [
 				'features' => $this->extractor->extract($sender->getEmail()),
 				'label' => $message->getFlagImportant() ? self::LABEL_IMPORTANT : self::LABEL_NOT_IMPORTANT,
+				'sender' => $sender->getEmail(),
 			];
 		}, $messages);
 	}

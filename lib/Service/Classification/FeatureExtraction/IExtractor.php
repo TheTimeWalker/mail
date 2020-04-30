@@ -27,6 +27,7 @@ namespace OCA\Mail\Service\Classification\FeatureExtraction;
 
 use OCA\Mail\Account;
 use OCA\Mail\Db\Mailbox;
+use OCA\Mail\Db\Message;
 
 interface IExtractor {
 
@@ -37,10 +38,14 @@ interface IExtractor {
 	 * @param Account $account
 	 * @param Mailbox[] $incomingMailboxes
 	 * @param Mailbox[] $outgoingMailboxes
+	 * @param Message[] $messages
 	 *
 	 * @return bool
 	 */
-	public function initialize(Account $account, array $incomingMailboxes, array $outgoingMailboxes): bool;
+	public function prepare(Account $account,
+							array $incomingMailboxes,
+							array $outgoingMailboxes,
+							array $messages): bool;
 
 	/**
 	 * Return the feature value for the given sender address
