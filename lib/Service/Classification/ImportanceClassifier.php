@@ -34,6 +34,7 @@ use OCA\Mail\Db\MailboxMapper;
 use OCA\Mail\Db\Message;
 use OCA\Mail\Db\MessageMapper;
 use OCA\Mail\Service\Classification\FeatureExtraction\CompositeExtractor;
+use OCA\Mail\Support\PerformanceLogger;
 use OCA\Mail\Vendor\Phpml\Classification\NaiveBayes;
 use OCA\Mail\Vendor\Phpml\FeatureExtraction\TokenCountVectorizer;
 use OCA\Mail\Vendor\Phpml\Tokenization\WhitespaceTokenizer;
@@ -81,16 +82,21 @@ class ImportanceClassifier {
 	/** @var CompositeExtractor */
 	private $extractor;
 
+	/** @var PerformanceLogger */
+	private $performanceLogger;
+
 	/** @var ILogger */
 	private $logger;
 
 	public function __construct(MailboxMapper $mailboxMapper,
 								MessageMapper $messageMapper,
 								CompositeExtractor $extractor,
+								PerformanceLogger $performanceLogger,
 								ILogger $logger) {
 		$this->mailboxMapper = $mailboxMapper;
 		$this->messageMapper = $messageMapper;
 		$this->extractor = $extractor;
+		$this->performanceLogger = $performanceLogger;
 		$this->logger = $logger;
 	}
 
@@ -110,6 +116,7 @@ class ImportanceClassifier {
 	 * @param Account $account
 	 */
 	public function train(Account $account): void {
+		$perf = $this->performanceLogger->start('importance classifier training');
 		$incomingMailboxes = array_filter($this->mailboxMapper->findAll($account), function (Mailbox $mailbox) {
 			foreach (self::EXEMPT_FROM_TRAINING as $excluded) {
 				if ($mailbox->isSpecialUse($excluded)) {
@@ -118,20 +125,27 @@ class ImportanceClassifier {
 			}
 			return true;
 		});
+		$perf->step('find incoming mailboxes');
 		// TODO: allow more than one outgoing mailbox
 		$sentMailbox = $this->mailboxMapper->findSpecial($account, 'sent');
 		$outgoingMailboexs = $sentMailbox === null ? [] : [$sentMailbox];
+		$perf->step('find outgoing mailboxes');
+
 		$mailboxIds = array_map(function (Mailbox $mailbox) {
 			return $mailbox->getId();
 		}, $incomingMailboxes);
-
 		$messages = $this->messageMapper->findLatestMessages($mailboxIds, self::MAX_TRAINING_SET_SIZE);
+		$perf->step('find latest ' . self::MAX_TRAINING_SET_SIZE . ' messages');
+
 		$features = $this->getFeaturesAndImportance($account, $incomingMailboxes, $outgoingMailboexs, $messages);
+		$perf->step('extract features from messages');
 
 		$classifier = new NaiveBayes();
 		$classifier->train(array_column($features, 'features'), array_column($features, 'label'));
+		$perf->step('train classifier');
 
 		$p = $classifier->predict(array_column($features, 'features'));
+		$perf->step('predict importance of training data');
 		$impo = [];
 		$notimpo = [];
 		for ($i = 0, $iMax = count($messages); $i < $iMax; $i++) {
@@ -158,22 +172,15 @@ class ImportanceClassifier {
 											  array $outgoingMailboxes,
 											  array $messages): array {
 		$this->extractor->initialize($account, $incomingMailboxes, $outgoingMailboxes);
-		$vectorizer = new TokenCountVectorizer(new WhitespaceTokenizer());
-		$vectorizer->fit(array_map(function(Message $message) {
-			return $message->getSubject();
-		}, $messages));
 
-		return array_map(function (Message $message) use ($vectorizer) {
+		return array_map(function (Message $message) {
 			$sender = $message->getFrom()->first();
-			if ($sender === null)  {
+			if ($sender === null) {
 				throw new RuntimeException("This should not happen");
 			}
-			$subject = $message->getSubject();
-			$tokens = [$subject];
-			$vectorizer->transform($tokens);
 
 			return [
-				'features' => array_merge($this->extractor->extract($sender->getEmail()), $tokens[0]),
+				'features' => $this->extractor->extract($sender->getEmail()),
 				'label' => $message->getFlagImportant() ? self::LABEL_IMPORTANT : self::LABEL_NOT_IMPORTANT,
 			];
 		}, $messages);
