@@ -109,7 +109,7 @@
 		<div class="composer-fields">
 			<!--@keypress="onBodyKeyPress"-->
 			<TextEditor
-				v-if="editorPlainText"
+				v-if="!encrypt && editorPlainText"
 				key="editor-plain"
 				v-model="bodyVal"
 				name="body"
@@ -120,7 +120,7 @@
 				@input="onInputChanged"
 			></TextEditor>
 			<TextEditor
-				v-else
+				v-else-if="!encrypt && !editorPlainText"
 				key="editor-rich"
 				v-model="bodyVal"
 				:html="true"
@@ -131,6 +131,7 @@
 				:bus="bus"
 				@input="onInputChanged"
 			></TextEditor>
+			<MailvelopeEditor v-else ref="mailvelopeEditor" v-model="bodyVal" :recipients="allRecipients" />
 		</div>
 		<div class="composer-actions">
 			<ComposerAttachments v-model="attachments" :bus="bus" @upload="onAttachmentsUploading" />
@@ -150,12 +151,18 @@
 						t('mail', 'Add attachment link from Files')
 					}}</ActionButton>
 					<ActionCheckbox
-						:checked="!editorPlainText"
-						:text="t('mail', 'Enable formatting')"
+						:checked="!encrypt && !editorPlainText"
+						:disabled="encrypt"
 						@check="editorPlainText = false"
 						@uncheck="editorPlainText = true"
 						>{{ t('mail', 'Enable formatting') }}</ActionCheckbox
 					>
+					<ActionCheckbox
+						v-if="mailvelopeAvailable"
+						:checked="encrypt"
+						@check="encrypt = true"
+						@uncheck="encrypt = false"
+					>{{ t('mail', 'Encrypt the message with Mailvelope.') }}</ActionCheckbox>
 				</Actions>
 				<div>
 					<input
@@ -204,6 +211,7 @@ import Loading from './Loading'
 import logger from '../logger'
 import TextEditor from './TextEditor'
 import {buildReplyBody} from '../ReplyBuilder'
+import MailvelopeEditor from "./MailvelopeEditor";
 
 const debouncedSearch = debouncePromise(findRecipient, 500)
 
@@ -220,6 +228,7 @@ const STATES = Object.seal({
 export default {
 	name: 'Composer',
 	components: {
+		MailvelopeEditor,
 		Actions,
 		ActionButton,
 		ActionCheckbox,
@@ -282,7 +291,6 @@ export default {
 			bodyVal: toHtml(this.body).value,
 			attachments: [],
 			noReply: this.to.some((to) => to.email.startsWith('noreply@') || to.email.startsWith('no-reply@')),
-			submitButtonTitle: t('mail', 'Send'),
 			draftsPromise: Promise.resolve(),
 			attachmentsPromise: Promise.resolve(),
 			savingDraft: undefined,
@@ -294,11 +302,16 @@ export default {
 			selectCc: this.cc,
 			selectBcc: this.bcc,
 			bus: new Vue(),
+			encrypt: false,
+			mailvelopeAvailable: false,
 		}
 	},
 	computed: {
 		aliases() {
 			return this.$store.getters.accounts.filter((a) => !a.isUnified)
+		},
+		allRecipients() {
+			return this.selectTo.concat(this.selectCc).concat(this.selectBcc)
 		},
 		selectableRecipients() {
 			return this.newRecipients
@@ -317,6 +330,13 @@ export default {
 			}
 			return false
 		},
+		submitButtonTitle() {
+			if (!this.mailvelopeAvailable) {
+				return t('mail', 'Send')
+			}
+
+			return this.encrypt ? t('mail', 'Encrypt and send') : t('mail', 'Send unencrypted')
+		}
 	},
 	watch: {
 		'$route.params.messageUid'(newID) {
@@ -326,6 +346,12 @@ export default {
 	beforeMount() {
 		this.setAlias()
 		this.initBody()
+
+		if (window.Mailvelope) {
+			this.mailvelopeAvailable = true
+		} else {
+			window.addEventListener('mailvelope', this.onMailvelopeLoaded, false);
+		}
 	},
 	mounted() {
 		this.$refs.toLabel.$el.focus()
@@ -343,6 +369,8 @@ export default {
 	},
 	beforeDestroy() {
 		this.$root.$off('newMessage')
+
+		window.removeEventListener('mailvelope', this.onMailvelopeLoaded);
 	},
 	methods: {
 		setAlias() {
@@ -460,6 +488,10 @@ export default {
 				.catch((error) => logger.error('could not upload attachments', {error}))
 				.then(() => logger.debug('attachments uploaded'))
 		},
+		onMailvelopeLoaded() {
+			logger.info('Mailvelope loaded')
+			this.mailvelopeAvailable = true
+		},
 		onNewToAddr(addr) {
 			this.onNewAddr(addr, this.selectTo)
 		},
@@ -477,7 +509,12 @@ export default {
 			this.newRecipients.push(res)
 			list.push(res)
 		},
-		onSend() {
+		async onSend() {
+			if (this.encrypt) {
+				logger.debug('get encrypted message from mailvelope')
+				await this.$refs.mailvelopeEditor.pull()
+			}
+
 			this.state = STATES.UPLOADING
 
 			return this.attachmentsPromise
