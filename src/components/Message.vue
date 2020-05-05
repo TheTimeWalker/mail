@@ -66,6 +66,7 @@
 					<Itinerary :entries="message.itineraries" :message-id="message.messageId" />
 				</div>
 				<MessageHTMLBody v-if="message.hasHtmlBody" :url="htmlUrl" />
+				<MessageEncryptedBody v-else-if="isEncrypted" :body="message.body" :from="from" />
 				<MessagePlainTextBody v-else :body="message.body" :signature="message.signature" />
 				<Popover v-if="message.attachments[0]" class="attachment-popover">
 					<Actions slot="trigger">
@@ -93,6 +94,7 @@ import {buildRecipients as buildReplyRecipients, buildReplySubject} from '../Rep
 import Error from './Error'
 import {getRandomMessageErrorMessage} from '../util/ErrorMessageFactory'
 import Itinerary from './Itinerary'
+import MessageEncryptedBody from './MessageEncryptedBody'
 import MessageHTMLBody from './MessageHTMLBody'
 import MessagePlainTextBody from './MessagePlainTextBody'
 import Loading from './Loading'
@@ -110,6 +112,7 @@ export default {
 		Itinerary,
 		Loading,
 		MessageAttachments,
+		MessageEncryptedBody,
 		MessageHTMLBody,
 		MessagePlainTextBody,
 		Modal,
@@ -130,6 +133,12 @@ export default {
 		}
 	},
 	computed: {
+		from() {
+			return this.message.from[0]?.email
+		},
+		isEncrypted() {
+			return this.message.body.startsWith('-----BEGIN PGP MESSAGE-----')
+		},
 		htmlUrl() {
 			return generateUrl('/apps/mail/api/accounts/{accountId}/folders/{folderId}/messages/{id}/html', {
 				accountId: this.message.accountId,

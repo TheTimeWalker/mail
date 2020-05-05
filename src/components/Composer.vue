@@ -347,7 +347,7 @@ export default {
 		this.setAlias()
 		this.initBody()
 
-		if (window.Mailvelope) {
+		if (window.mailvelope) {
 			this.mailvelopeAvailable = true
 		} else {
 			window.addEventListener('mailvelope', this.onMailvelopeLoaded, false);
