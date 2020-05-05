@@ -6,7 +6,7 @@
 </template>
 
 <script>
-import logger from "../logger";
+import logger from '../logger'
 
 export default {
 	name: 'MessageEncryptedBody',
@@ -30,10 +30,10 @@ export default {
 		if (window.mailvelope) {
 			this.mailvelopeAvailable = true
 		} else {
-			window.addEventListener('mailvelope', this.onMailvelopeLoaded, false);
+			window.addEventListener('mailvelope', this.onMailvelopeLoaded, false)
 		}
 	},
-	mounted () {
+	mounted() {
 		window.mailvelope.createDisplayContainer('#mail-content', this.body, undefined, {
 			senderAddress: this.from,
 		})

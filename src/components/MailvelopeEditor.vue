@@ -24,44 +24,44 @@
 </template>
 
 <script>
-	import logger from '../logger'
+import logger from '../logger'
 
-	export default {
-		name: 'MailvelopeEditor',
-		props: {
-			value: {
-				type: String,
-				required: true,
-			},
-			recipients: {
-				type: Array,
-				required: true,
-			},
+export default {
+	name: 'MailvelopeEditor',
+	props: {
+		value: {
+			type: String,
+			required: true,
 		},
-		data() {
-			return {
-				editor: undefined,
-			}
+		recipients: {
+			type: Array,
+			required: true,
 		},
-		async mounted() {
-			this.editor = await window.mailvelope.createEditorContainer('#mailvelope-composer')
-		},
-		methods: {
-			async pull() {
-				const recipients = this.recipients.map(r => r.email)
-				logger.info('encrypting message', {recipients})
-				const armored = await this.editor.encrypt(recipients)
-				logger.info('message encryted', {armored})
-
-				this.$emit('input', armored)
-			}
+	},
+	data() {
+		return {
+			editor: undefined,
 		}
-	}
+	},
+	async mounted() {
+		this.editor = await window.mailvelope.createEditorContainer('#mailvelope-composer')
+	},
+	methods: {
+		async pull() {
+			const recipients = this.recipients.map((r) => r.email)
+			logger.info('encrypting message', {recipients})
+			const armored = await this.editor.encrypt(recipients)
+			logger.info('message encryted', {armored})
+
+			this.$emit('input', armored)
+		},
+	},
+}
 </script>
 
 <style scoped>
-	#mailvelope-composer {
-		width: 100%;
-		height: 450px;
-	}
+#mailvelope-composer {
+	width: 100%;
+	height: 450px;
+}
 </style>

@@ -162,7 +162,8 @@
 						:checked="encrypt"
 						@check="encrypt = true"
 						@uncheck="encrypt = false"
-					>{{ t('mail', 'Encrypt the message with Mailvelope.') }}</ActionCheckbox>
+						>{{ t('mail', 'Encrypt the message with Mailvelope.') }}</ActionCheckbox
+					>
 				</Actions>
 				<div>
 					<input
@@ -211,7 +212,7 @@ import Loading from './Loading'
 import logger from '../logger'
 import TextEditor from './TextEditor'
 import {buildReplyBody} from '../ReplyBuilder'
-import MailvelopeEditor from "./MailvelopeEditor";
+import MailvelopeEditor from './MailvelopeEditor'
 
 const debouncedSearch = debouncePromise(findRecipient, 500)
 
@@ -336,7 +337,7 @@ export default {
 			}
 
 			return this.encrypt ? t('mail', 'Encrypt and send') : t('mail', 'Send unencrypted')
-		}
+		},
 	},
 	watch: {
 		'$route.params.messageUid'(newID) {
@@ -350,7 +351,7 @@ export default {
 		if (window.mailvelope) {
 			this.mailvelopeAvailable = true
 		} else {
-			window.addEventListener('mailvelope', this.onMailvelopeLoaded, false);
+			window.addEventListener('mailvelope', this.onMailvelopeLoaded, false)
 		}
 	},
 	mounted() {
@@ -370,7 +371,7 @@ export default {
 	beforeDestroy() {
 		this.$root.$off('newMessage')
 
-		window.removeEventListener('mailvelope', this.onMailvelopeLoaded);
+		window.removeEventListener('mailvelope', this.onMailvelopeLoaded)
 	},
 	methods: {
 		setAlias() {
