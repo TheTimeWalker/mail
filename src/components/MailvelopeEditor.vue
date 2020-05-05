@@ -20,8 +20,7 @@
   -->
 
 <template>
-	<openpgp-email-write ref="editor" id="mailvelope-composer" data-quota="1024" data-sign-msg="true">
-	</openpgp-email-write>
+	<div id="mailvelope-composer"></div>
 </template>
 
 <script>
@@ -44,14 +43,10 @@
 				editor: undefined,
 			}
 		},
-		mounted() {
-			this.$refs.editor.addEventListener('ready', this.editorReady)
+		async mounted() {
+			this.editor = await window.mailvelope.createEditorContainer('#mailvelope-composer')
 		},
 		methods: {
-			editorReady(e) {
-				logger.debug('Mailvelope editor is ready')
-				this.editor = e.target.editor
-			},
 			async pull() {
 				const recipients = this.recipients.map(r => r.email)
 				logger.info('encrypting message', {recipients})
