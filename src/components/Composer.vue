@@ -164,6 +164,9 @@
 						@uncheck="encrypt = false"
 						>{{ t('mail', 'Encrypt the message with Mailvelope.') }}</ActionCheckbox
 					>
+					<ActionLink v-else href="https://www.mailvelope.com/" target="_blank" icon="icon-password">{{
+						t('mail', 'Looking for a way to encrypt your emails? Install the Mailvelope browser extension!')
+					}}</ActionLink>
 				</Actions>
 				<div>
 					<input
@@ -201,6 +204,7 @@ import debouncePromise from 'debounce-promise'
 import Actions from '@nextcloud/vue/dist/Components/Actions'
 import ActionButton from '@nextcloud/vue/dist/Components/ActionButton'
 import ActionCheckbox from '@nextcloud/vue/dist/Components/ActionCheckbox'
+import ActionLink from '@nextcloud/vue/dist/Components/ActionLink'
 import Multiselect from '@nextcloud/vue/dist/Components/Multiselect'
 import {translate as t} from '@nextcloud/l10n'
 import Vue from 'vue'
@@ -233,6 +237,7 @@ export default {
 		Actions,
 		ActionButton,
 		ActionCheckbox,
+		ActionLink,
 		ComposerAttachments,
 		Loading,
 		Multiselect,
