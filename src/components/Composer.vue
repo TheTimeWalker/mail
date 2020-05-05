@@ -147,7 +147,7 @@
 					<ActionButton icon="icon-folder" @click="onAddCloudAttachment">{{
 						t('mail', 'Add attachment from Files')
 					}}</ActionButton>
-					<ActionButton icon="icon-folder" @click="onAddCloudAttachmentLink">{{
+					<ActionButton :disabled="encrypt" icon="icon-folder" @click="onAddCloudAttachmentLink">{{
 						t('mail', 'Add attachment link from Files')
 					}}</ActionButton>
 					<ActionCheckbox
