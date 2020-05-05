@@ -206,7 +206,7 @@ import Vue from 'vue'
 
 import ComposerAttachments from './ComposerAttachments'
 import {findRecipient} from '../service/AutocompleteService'
-import {detect, html, toHtml, toPlain} from '../util/text'
+import {detect, html, plain, toHtml, toPlain} from '../util/text'
 import Loading from './Loading'
 import logger from '../logger'
 import TextEditor from './TextEditor'
@@ -426,7 +426,7 @@ export default {
 				bcc: this.selectBcc.map(this.recipientToRfc822).join(', '),
 				draftUID: uid,
 				subject: this.subjectVal,
-				body: html(this.bodyVal),
+				body: this.encrypt ? plain(this.bodyVal) : html(this.bodyVal),
 				attachments: this.attachments,
 				folderId: this.replyTo ? this.replyTo.folderId : undefined,
 				messageId: this.replyTo ? this.replyTo.id : undefined,
