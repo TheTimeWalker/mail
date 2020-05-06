@@ -27,24 +27,16 @@ namespace OCA\Mail\Service\Classification;
 
 use Horde_Imap_Client;
 use OCA\Mail\Account;
-use OCA\Mail\Address;
-use OCA\Mail\AddressList;
 use OCA\Mail\Db\Classifier;
-use OCA\Mail\Db\ClassifierMapper;
 use OCA\Mail\Db\Mailbox;
 use OCA\Mail\Db\MailboxMapper;
 use OCA\Mail\Db\Message;
 use OCA\Mail\Db\MessageMapper;
 use OCA\Mail\Service\Classification\FeatureExtraction\CompositeExtractor;
 use OCA\Mail\Support\PerformanceLogger;
-use OCA\Mail\Support\PerformanceLoggerTask;
 use OCA\Mail\Vendor\Phpml\Classification\NaiveBayes;
 use OCA\Mail\Vendor\Phpml\Estimator;
-use OCA\Mail\Vendor\Phpml\Exception\InvalidArgumentException;
-use OCA\Mail\Vendor\Phpml\FeatureExtraction\TokenCountVectorizer;
 use OCA\Mail\Vendor\Phpml\Metric\ClassificationReport;
-use OCA\Mail\Vendor\Phpml\Tokenization\WhitespaceTokenizer;
-use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\ILogger;
 use RuntimeException;
 use function array_column;
@@ -205,7 +197,6 @@ class ImportanceClassifier {
 	}
 
 	public function isImportant(Account $account, Mailbox $mailbox, Message $message): bool {
-
 	}
 
 	private function trainClassifier(array $trainingSet): Estimator {
@@ -246,5 +237,4 @@ class ImportanceClassifier {
 		$classifier->setF1ScoreImportant($f1ScoreImportant);
 		return $classifier;
 	}
-
 }

@@ -65,7 +65,6 @@ use OCP\AppFramework\Db\Entity;
  * @method void setCreatedAt(int $createdAt)
  */
 class Classifier extends Entity {
-
 	public const TYPE_IMPORTANCE = 'importance';
 
 	/** @var int */
@@ -117,5 +116,4 @@ class Classifier extends Entity {
 		$this->addType('active', 'bool');
 		$this->addType('createdAt', 'int');
 	}
-
 }

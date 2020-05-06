@@ -71,5 +71,4 @@ class TrainAccount extends Command {
 		$mbs = (int)(memory_get_peak_usage() / 1024 / 1024);
 		$output->writeln('<info>' . $mbs . 'MB of memory used</info>');
 	}
-
 }

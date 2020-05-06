@@ -68,5 +68,4 @@ class CompositeExtractor {
 			return $extractor->extract($email);
 		}, $this->applicableExtractors);
 	}
-
 }

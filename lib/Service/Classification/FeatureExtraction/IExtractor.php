@@ -55,5 +55,4 @@ interface IExtractor {
 	 * @return float
 	 */
 	public function extract(string $email): float;
-
 }

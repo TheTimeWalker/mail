@@ -26,14 +26,11 @@ declare(strict_types=1);
 namespace OCA\Mail\Service\Classification;
 
 use OCA\Mail\Account;
-use OCA\Mail\Address;
 use OCA\Mail\Db\Mailbox;
 use OCA\Mail\Db\MailboxMapper;
 use OCA\Mail\Db\Message;
 use OCA\Mail\Db\StatisticsDao;
 use OCP\AppFramework\Db\DoesNotExistException;
-use OCP\DB\QueryBuilder\IQueryBuilder;
-use OCP\IDBConnection;
 
 class OftenContactedSenderClassifier extends AClassifier {
 	use SafeRatio;
@@ -69,5 +66,4 @@ class OftenContactedSenderClassifier extends AClassifier {
 			true // The very first message is important
 		);
 	}
-
 }

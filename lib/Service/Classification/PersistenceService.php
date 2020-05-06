@@ -43,7 +43,6 @@ use function file_get_contents;
 use function get_class;
 
 class PersistenceService {
-
 	private const ADD_DATA_FOLDER = 'classifiers';
 
 	/** @var ClassifierMapper */
@@ -129,5 +128,4 @@ class PersistenceService {
 		$classifier->setActive(true);
 		$this->mapper->update($classifier);
 	}
-
 }

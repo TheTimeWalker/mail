@@ -221,5 +221,4 @@ class StatisticsDao {
 		$result->closeCursor();
 		return (int)$cnt;
 	}
-
 }

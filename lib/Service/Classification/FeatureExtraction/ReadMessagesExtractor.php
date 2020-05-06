@@ -25,13 +25,10 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Service\Classification\FeatureExtraction;
 
-
 use OCA\Mail\Account;
-use OCA\Mail\Db\Mailbox;
 use OCA\Mail\Db\Message;
 use OCA\Mail\Db\StatisticsDao;
 use function array_map;
-use function array_reduce;
 use function array_unique;
 
 class ReadMessagesExtractor implements IExtractor {
@@ -73,5 +70,4 @@ class ReadMessagesExtractor implements IExtractor {
 
 		return ($this->readMessages[$email] ?? 0) / $total;
 	}
-
 }

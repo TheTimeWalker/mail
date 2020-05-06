@@ -26,11 +26,9 @@ declare(strict_types=1);
 namespace OCA\Mail\Service\Classification\FeatureExtraction;
 
 use OCA\Mail\Account;
-use OCA\Mail\Db\Mailbox;
 use OCA\Mail\Db\Message;
 use OCA\Mail\Db\StatisticsDao;
 use function array_map;
-use function array_reduce;
 use function array_unique;
 
 class ImportantMessagesExtractor implements IExtractor {
@@ -65,5 +63,4 @@ class ImportantMessagesExtractor implements IExtractor {
 	public function extract(string $email): float {
 		return ($this->flaggedMessages[$email] ?? 0) / ($this->totalMessages[$email] ?? 0);
 	}
-
 }

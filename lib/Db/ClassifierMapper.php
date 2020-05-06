@@ -29,9 +29,7 @@ use OCP\AppFramework\Db\QBMapper;
 use OCP\IDBConnection;
 
 class ClassifierMapper extends QBMapper {
-
 	public function __construct(IDBConnection $db) {
 		parent::__construct($db, 'mail_classifiers');
 	}
-
 }
