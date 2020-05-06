@@ -29,6 +29,8 @@ use Horde_Imap_Client;
 use OCA\Mail\Account;
 use OCA\Mail\Address;
 use OCA\Mail\AddressList;
+use OCA\Mail\Db\Classifier;
+use OCA\Mail\Db\ClassifierMapper;
 use OCA\Mail\Db\Mailbox;
 use OCA\Mail\Db\MailboxMapper;
 use OCA\Mail\Db\Message;
@@ -42,6 +44,7 @@ use OCA\Mail\Vendor\Phpml\Exception\InvalidArgumentException;
 use OCA\Mail\Vendor\Phpml\FeatureExtraction\TokenCountVectorizer;
 use OCA\Mail\Vendor\Phpml\Metric\ClassificationReport;
 use OCA\Mail\Vendor\Phpml\Tokenization\WhitespaceTokenizer;
+use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\ILogger;
 use RuntimeException;
 use function array_column;
@@ -87,6 +90,9 @@ class ImportanceClassifier {
 	/** @var CompositeExtractor */
 	private $extractor;
 
+	/** @var PersistenceService */
+	private $persistenceService;
+
 	/** @var PerformanceLogger */
 	private $performanceLogger;
 
@@ -96,11 +102,13 @@ class ImportanceClassifier {
 	public function __construct(MailboxMapper $mailboxMapper,
 								MessageMapper $messageMapper,
 								CompositeExtractor $extractor,
+								PersistenceService $persistenceService,
 								PerformanceLogger $performanceLogger,
 								ILogger $logger) {
 		$this->mailboxMapper = $mailboxMapper;
 		$this->messageMapper = $messageMapper;
 		$this->extractor = $extractor;
+		$this->persistenceService = $persistenceService;
 		$this->performanceLogger = $performanceLogger;
 		$this->logger = $logger;
 	}
@@ -154,14 +162,16 @@ class ImportanceClassifier {
 		);
 		$validationSet = array_slice($dataSet, 0, $validationThreshold);
 		$trainingSet = array_slice($dataSet, $validationThreshold);
-		$validationClassifier = $this->trainClassifier($trainingSet);
-		$this->validateClassifier($validationClassifier, $validationSet);
+		$validationEstimator = $this->trainClassifier($trainingSet);
+		$classifier = $this->validateClassifier($validationEstimator, $trainingSet, $validationSet);
 		$perf->step("train and validate classifier with training and validation sets");
 
-		$this->trainClassifier($dataSet);
+		$estimator = $this->trainClassifier($dataSet);
 		$perf->step("train classifier with full data set");
 
-		$perf->end();
+		$classifier->setAccountId($account->getId());
+		$classifier->setDuration($perf->end());
+		$this->persistenceService->persist($classifier, $estimator);
 	}
 
 	/**
@@ -207,8 +217,10 @@ class ImportanceClassifier {
 		return $classifier;
 	}
 
-	private function validateClassifier(Estimator $classifier, array $validationSet): void {
-		$predictedValidationLabel = $classifier->predict(array_column($validationSet, 'features'));
+	private function validateClassifier(Estimator $estimator,
+										array $trainingSet,
+										array $validationSet): Classifier {
+		$predictedValidationLabel = $estimator->predict(array_column($validationSet, 'features'));
 		$report = new ClassificationReport($predictedValidationLabel, array_column($validationSet, 'label'));
 		/**
 		 * What we care most is the percentage of messages classified as important in relation to the truly important messages
@@ -224,6 +236,15 @@ class ImportanceClassifier {
 		$precisionImportant = $report->getPrecision()[self::LABEL_IMPORTANT];
 		$f1ScoreImportant = $report->getF1score()[self::LABEL_IMPORTANT];
 		$this->logger->debug("classifier validated: recall(important)=$recallImportant, precision(important)=$precisionImportant f1(important)=$f1ScoreImportant");
+
+		$classifier = new Classifier();
+		$classifier->setType(Classifier::TYPE_IMPORTANCE);
+		$classifier->setTrainingSetSize(count($trainingSet));
+		$classifier->setValidationSetSize(count($validationSet));
+		$classifier->setRecallImportant($recallImportant);
+		$classifier->setPrecisionImportant($precisionImportant);
+		$classifier->setF1ScoreImportant($f1ScoreImportant);
+		return $classifier;
 	}
 
 }
