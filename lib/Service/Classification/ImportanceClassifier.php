@@ -133,6 +133,14 @@ class ImportanceClassifier {
 			return $mailbox->getId();
 		}, $incomingMailboxes);
 		$messages = $this->messageMapper->findLatestMessages($mailboxIds, self::MAX_TRAINING_SET_SIZE);
+		$importantMessages = array_filter($messages, function(Message $message) {
+			return $message->getFlagImportant();
+		});
+		if (empty($importantMessages)) {
+			$this->logger->warning('not enough messages to train a classifier');
+			$perf->end();
+			return;
+		}
 		$perf->step('find latest ' . self::MAX_TRAINING_SET_SIZE . ' messages');
 
 		$dataSet = $this->getFeaturesAndImportance($account, $incomingMailboxes, $outgoingMailboxes, $messages);
