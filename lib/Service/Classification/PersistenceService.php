@@ -45,7 +45,6 @@ use OCP\ITempManager;
 use function file_get_contents;
 use function file_put_contents;
 use function get_class;
-use function strlen;
 
 class PersistenceService {
 	private const ADD_DATA_FOLDER = 'classifiers';

@@ -27,7 +27,6 @@ namespace OCA\Mail\Listener;
 
 use OCA\Mail\Events\NewMessagesSynchronized;
 use OCA\Mail\Service\Classification\ImportanceClassifier;
-use OCA\Mail\Service\Classification\MessageClassifier;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 

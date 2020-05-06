@@ -246,7 +246,7 @@ class ImportanceClassifier {
 			array_map(function (Message $m) {
 				return $m->getUid();
 			}, $messages),
-			array_map(function($p) {
+			array_map(function ($p) {
 				return $p === self::LABEL_IMPORTANT;
 			}, $predictions)
 		);
