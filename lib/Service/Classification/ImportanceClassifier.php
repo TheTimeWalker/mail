@@ -35,14 +35,19 @@ use OCA\Mail\Db\Message;
 use OCA\Mail\Db\MessageMapper;
 use OCA\Mail\Service\Classification\FeatureExtraction\CompositeExtractor;
 use OCA\Mail\Support\PerformanceLogger;
+use OCA\Mail\Support\PerformanceLoggerTask;
 use OCA\Mail\Vendor\Phpml\Classification\NaiveBayes;
+use OCA\Mail\Vendor\Phpml\Estimator;
+use OCA\Mail\Vendor\Phpml\Exception\InvalidArgumentException;
 use OCA\Mail\Vendor\Phpml\FeatureExtraction\TokenCountVectorizer;
+use OCA\Mail\Vendor\Phpml\Metric\ClassificationReport;
 use OCA\Mail\Vendor\Phpml\Tokenization\WhitespaceTokenizer;
 use OCP\ILogger;
 use RuntimeException;
 use function array_column;
 use function array_filter;
 use function array_map;
+use function array_slice;
 
 class ImportanceClassifier {
 
@@ -137,24 +142,26 @@ class ImportanceClassifier {
 		$messages = $this->messageMapper->findLatestMessages($mailboxIds, self::MAX_TRAINING_SET_SIZE);
 		$perf->step('find latest ' . self::MAX_TRAINING_SET_SIZE . ' messages');
 
-		$features = $this->getFeaturesAndImportance($account, $incomingMailboxes, $outgoingMailboexs, $messages);
+		$dataSet = $this->getFeaturesAndImportance($account, $incomingMailboxes, $outgoingMailboexs, $messages);
 		$perf->step('extract features from messages');
 
-		$classifier = new NaiveBayes();
-		$classifier->train(array_column($features, 'features'), array_column($features, 'label'));
-		$perf->step('train classifier');
+		/**
+		 * How many of the most recent messages are excluded from training?
+		 */
+		$validationThreshold = max(
+			5,
+			(int)(count($dataSet) * 0.1)
+		);
+		$validationSet = array_slice($dataSet, 0, $validationThreshold);
+		$trainingSet = array_slice($dataSet, $validationThreshold);
+		$validationClassifier = $this->trainClassifier($trainingSet);
+		$this->validateClassifier($validationClassifier, $validationSet);
+		$perf->step("train and validate classifier with training and validation sets");
 
-		$p = $classifier->predict(array_column($features, 'features'));
-		$perf->step('predict importance of training data');
-		$impo = [];
-		$notimpo = [];
-		for ($i = 0, $iMax = count($messages); $i < $iMax; $i++) {
-			if ($p[$i] === 'i') {
-				$impo[] = $messages[$i];
-			} else {
-				$notimpo[] = $messages[$i];
-			}
-		}
+		$this->trainClassifier($dataSet);
+		$perf->step("train classifier with full data set");
+
+		$perf->end();
 	}
 
 	/**
@@ -189,6 +196,34 @@ class ImportanceClassifier {
 
 	public function isImportant(Account $account, Mailbox $mailbox, Message $message): bool {
 
+	}
+
+	private function trainClassifier(array $trainingSet): Estimator {
+		$classifier = new NaiveBayes();
+		$classifier->train(
+			array_column($trainingSet, 'features'),
+			array_column($trainingSet, 'label')
+		);
+		return $classifier;
+	}
+
+	private function validateClassifier(Estimator $classifier, array $validationSet): void {
+		$predictedValidationLabel = $classifier->predict(array_column($validationSet, 'features'));
+		$report = new ClassificationReport($predictedValidationLabel, array_column($validationSet, 'label'));
+		/**
+		 * What we care most is the percentage of messages classified as important in relation to the truly important messages
+		 * as we want to have a classification that rather flags too much as important that too little.
+		 *
+		 * The f1 score tells us how balanced the results are, as in, if the classifier blindly detects messages as important
+		 * or if there is some a pattern it.
+		 *
+		 * Ref https://en.wikipedia.org/wiki/Precision_and_recall
+		 * Ref https://en.wikipedia.org/wiki/F1_score
+		 */
+		$recallImportant = $report->getRecall()[self::LABEL_IMPORTANT];
+		$precisionImportant = $report->getPrecision()[self::LABEL_IMPORTANT];
+		$f1ScoreImportant = $report->getF1score()[self::LABEL_IMPORTANT];
+		$this->logger->debug("classifier validated: recall(important)=$recallImportant, precision(important)=$precisionImportant f1(important)=$f1ScoreImportant");
 	}
 
 }
