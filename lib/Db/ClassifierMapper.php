@@ -25,11 +25,34 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Db;
 
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
 
 class ClassifierMapper extends QBMapper {
 	public function __construct(IDBConnection $db) {
 		parent::__construct($db, 'mail_classifiers');
+	}
+
+	/**
+	 * @param int $id
+	 *
+	 * @return Classifier
+	 * @throws DoesNotExistException
+	 */
+	public function findLatest(int $id): Classifier {
+		$qb = $this->db->getQueryBuilder();
+
+		$select = $qb->select('*')
+			->from($this->getTableName())
+			->where(
+				$qb->expr()->eq('account_id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT), IQueryBuilder::PARAM_INT),
+				$qb->expr()->eq('active', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL), IQueryBuilder::PARAM_BOOL)
+			)
+			->orderBy('created_at', 'asc')
+			->setMaxResults(1);
+
+		return $this->findEntity($select);
 	}
 }

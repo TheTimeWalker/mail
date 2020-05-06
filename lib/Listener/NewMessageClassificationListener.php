@@ -26,16 +26,17 @@ declare(strict_types=1);
 namespace OCA\Mail\Listener;
 
 use OCA\Mail\Events\NewMessagesSynchronized;
+use OCA\Mail\Service\Classification\ImportanceClassifier;
 use OCA\Mail\Service\Classification\MessageClassifier;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 
 class NewMessageClassificationListener implements IEventListener {
 
-	/** @var MessageClassifier */
+	/** @var ImportanceClassifier */
 	private $classifier;
 
-	public function __construct(MessageClassifier $classifier) {
+	public function __construct(ImportanceClassifier $classifier) {
 		$this->classifier = $classifier;
 	}
 
@@ -44,8 +45,14 @@ class NewMessageClassificationListener implements IEventListener {
 			return;
 		}
 
+		$predictions = $this->classifier->classifyImportance(
+			$event->getAccount(),
+			$event->getMailbox(),
+			$event->getMessages()
+		);
+
 		foreach ($event->getMessages() as $message) {
-			if ($this->classifier->isImportant($event->getAccount(), $event->getMailbox(), $message)) {
+			if ($predictions[$message->getUid()] ?? false) {
 				$message->setFlagImportant(true);
 			}
 		}

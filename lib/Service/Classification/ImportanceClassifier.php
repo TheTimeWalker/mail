@@ -37,9 +37,11 @@ use OCA\Mail\Support\PerformanceLogger;
 use OCA\Mail\Vendor\Phpml\Classification\NaiveBayes;
 use OCA\Mail\Vendor\Phpml\Estimator;
 use OCA\Mail\Vendor\Phpml\Metric\ClassificationReport;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\ILogger;
 use RuntimeException;
 use function array_column;
+use function array_combine;
 use function array_filter;
 use function array_map;
 use function array_slice;
@@ -122,18 +124,9 @@ class ImportanceClassifier {
 	 */
 	public function train(Account $account): void {
 		$perf = $this->performanceLogger->start('importance classifier training');
-		$incomingMailboxes = array_filter($this->mailboxMapper->findAll($account), function (Mailbox $mailbox) {
-			foreach (self::EXEMPT_FROM_TRAINING as $excluded) {
-				if ($mailbox->isSpecialUse($excluded)) {
-					return false;
-				}
-			}
-			return true;
-		});
+		$incomingMailboxes = $this->getIncomingMailboxes($account);
 		$perf->step('find incoming mailboxes');
-		// TODO: allow more than one outgoing mailbox
-		$sentMailbox = $this->mailboxMapper->findSpecial($account, 'sent');
-		$outgoingMailboexs = $sentMailbox === null ? [] : [$sentMailbox];
+		$outgoingMailboxes = $this->getOutgoingMailboxes($account);
 		$perf->step('find outgoing mailboxes');
 
 		$mailboxIds = array_map(function (Mailbox $mailbox) {
@@ -142,7 +135,7 @@ class ImportanceClassifier {
 		$messages = $this->messageMapper->findLatestMessages($mailboxIds, self::MAX_TRAINING_SET_SIZE);
 		$perf->step('find latest ' . self::MAX_TRAINING_SET_SIZE . ' messages');
 
-		$dataSet = $this->getFeaturesAndImportance($account, $incomingMailboxes, $outgoingMailboexs, $messages);
+		$dataSet = $this->getFeaturesAndImportance($account, $incomingMailboxes, $outgoingMailboxes, $messages);
 		$perf->step('extract features from messages');
 
 		/**
@@ -164,6 +157,38 @@ class ImportanceClassifier {
 		$classifier->setAccountId($account->getId());
 		$classifier->setDuration($perf->end());
 		$this->persistenceService->persist($classifier, $estimator);
+	}
+
+	/**
+	 * @param Account $account
+	 *
+	 * @return Mailbox[]
+	 */
+	private function getIncomingMailboxes(Account $account): array {
+		return array_filter($this->mailboxMapper->findAll($account), function (Mailbox $mailbox) {
+			foreach (self::EXEMPT_FROM_TRAINING as $excluded) {
+				if ($mailbox->isSpecialUse($excluded)) {
+					return false;
+				}
+			}
+			return true;
+		});
+	}
+
+	/**
+	 * @param Account $account
+	 *
+	 * @return Mailbox[]
+	 * @todo allow more than one outgoing mailbox
+	 */
+	private function getOutgoingMailboxes(Account $account): array {
+		try {
+			return [
+				$this->mailboxMapper->findSpecial($account, 'sent')
+			];
+		} catch (DoesNotExistException $e) {
+			return [];
+		}
 	}
 
 	/**
@@ -196,7 +221,35 @@ class ImportanceClassifier {
 		}, $messages);
 	}
 
-	public function isImportant(Account $account, Mailbox $mailbox, Message $message): bool {
+	/**
+	 * @param Account $account
+	 * @param Mailbox $mailbox
+	 * @param Message[] $messages
+	 *
+	 * @return array
+	 */
+	public function classifyImportance(Account $account, Mailbox $mailbox, array $messages): array {
+		$estimator = $this->persistenceService->loadLatest($account);
+		if ($estimator === null) {
+			// TODO: fallback to rules-based classification
+			return [];
+		}
+
+		$features = $this->getFeaturesAndImportance(
+			$account,
+			$this->getIncomingMailboxes($account),
+			$this->getOutgoingMailboxes($account),
+			$messages
+		);
+		$predictions = $estimator->predict(array_column($features, 'features'));
+		return array_combine(
+			array_map(function (Message $m) {
+				return $m->getUid();
+			}, $messages),
+			array_map(function($p) {
+				return $p === self::LABEL_IMPORTANT;
+			}, $predictions)
+		);
 	}
 
 	private function trainClassifier(array $trainingSet): Estimator {

@@ -25,6 +25,7 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Service\Classification;
 
+use OCA\Mail\Account;
 use OCA\Mail\AppInfo\Application;
 use OCA\Mail\Db\Classifier;
 use OCA\Mail\Db\ClassifierMapper;
@@ -34,13 +35,17 @@ use OCA\Mail\Vendor\Phpml\Exception\FileException;
 use OCA\Mail\Vendor\Phpml\Exception\SerializeException;
 use OCA\Mail\Vendor\Phpml\ModelManager;
 use OCP\App\IAppManager;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\Files\IAppData;
 use OCP\Files\NotFoundException;
 use OCP\Files\NotPermittedException;
+use OCP\ICacheFactory;
 use OCP\ITempManager;
 use function file_get_contents;
+use function file_put_contents;
 use function get_class;
+use function strlen;
 
 class PersistenceService {
 	private const ADD_DATA_FOLDER = 'classifiers';
@@ -63,18 +68,23 @@ class PersistenceService {
 	/** @var IAppManager */
 	private $appManager;
 
+	/** @var ICacheFactory */
+	private $cacheFactory;
+
 	public function __construct(ClassifierMapper $mapper,
 								IAppData $appData,
 								ITempManager $tempManager,
 								ITimeFactory $timeFactory,
 								ModelManager $modelManager,
-								IAppManager $appManager) {
+								IAppManager $appManager,
+								ICacheFactory $cacheFactory) {
 		$this->mapper = $mapper;
 		$this->appData = $appData;
 		$this->tempManager = $tempManager;
 		$this->timeFactory = $timeFactory;
 		$this->modelManager = $modelManager;
 		$this->appManager = $appManager;
+		$this->cacheFactory = $cacheFactory;
 	}
 
 	/**
@@ -127,5 +137,66 @@ class PersistenceService {
 		 */
 		$classifier->setActive(true);
 		$this->mapper->update($classifier);
+	}
+
+	public function loadLatest(Account $account): ?Estimator {
+		try {
+			$latestModel = $this->mapper->findLatest($account->getId());
+		} catch (DoesNotExistException $e) {
+			return null;
+		}
+		return $this->load($latestModel->getId());
+	}
+
+	public function load(int $id): Estimator {
+		$cached = $this->getCached($id);
+		if ($cached !== null) {
+			$serialized = $cached;
+		} else {
+			try {
+				$modelsFolder = $this->appData->getFolder(self::ADD_DATA_FOLDER);
+				$modelFile = $modelsFolder->getFile((string)$id);
+			} catch (NotFoundException $e) {
+				throw new ServiceException("Could not load classifier $id: " . $e->getMessage(), 0, $e);
+			}
+
+			$serialized = $modelFile->getContent();
+
+			$this->cache($id, $serialized);
+		}
+
+		$tmpPath = $this->tempManager->getTemporaryFile();
+		file_put_contents($tmpPath, $serialized);
+
+		try {
+			$estimator = $this->modelManager->restoreFromFile($tmpPath);
+		} catch (SerializeException $e) {
+			throw new ServiceException("Could not deserialize persisted classifier $id: " . $e->getMessage(), 0, $e);
+		}
+
+		return $estimator;
+	}
+
+	private function getCacheKey(int $id): string {
+		return "mail_classifier_$id";
+	}
+
+	private function getCached(int $id): ?string {
+		if (!$this->cacheFactory->isLocalCacheAvailable()) {
+			return null;
+		}
+		$cache = $this->cacheFactory->createLocal();
+
+		return $cache->get(
+			$this->getCacheKey($id)
+		);
+	}
+
+	private function cache(int $id, string $serialized): void {
+		if (!$this->cacheFactory->isLocalCacheAvailable()) {
+			return;
+		}
+		$cache = $this->cacheFactory->createLocal();
+		$cache->set($this->getCacheKey($id), $serialized);
 	}
 }
