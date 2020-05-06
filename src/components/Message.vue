@@ -44,7 +44,7 @@
 						</ActionButton>
 
 						<ActionButton icon="icon-junk" @click="onToggleJunk">
-							{{ envelope.flags.junk ? t('mail', 'Mark not junk') : t('mail', 'Mark junk') }}
+							{{ envelope.flags.notjunk ? t('mail', 'Mark not junk') : t('mail', 'Mark junk') }}
 						</ActionButton>
 						<ActionButton
 							:icon="sourceLoading ? 'icon-loading-small' : 'icon-details'"

@@ -19,9 +19,9 @@
 			v-html="importantSvg"
 		></div>
 		<div
-			v-if="data.flags.junk"
+			v-if="data.flags.notjunk"
 			class="app-content-list-item-star icon-junk"
-			:data-starred="data.flags.junk ? 'true' : 'false'"
+			:data-starred="data.flags.notjunk ? 'true' : 'false'"
 			@click.prevent="onToggleJunk"
 		></div>
 		<div class="app-content-list-item-icon">
@@ -52,7 +52,7 @@
 				data.flags.unseen ? t('mail', 'Mark read') : t('mail', 'Mark unread')
 			}}</ActionButton>
 			<ActionButton icon="icon-junk" @click.prevent="onToggleJunk">{{
-				data.flags.junk ? t('mail', 'Mark not junk') : t('mail', 'Mark junk')
+				data.flags.notjunk ? t('mail', 'Mark not junk') : t('mail', 'Mark junk')
 				}}</ActionButton>
 			<ActionButton icon="icon-delete" @click.prevent="onDelete">{{ t('mail', 'Delete') }}</ActionButton>
 		</Actions>
@@ -203,17 +203,13 @@ export default {
 		stroke: var(--color-main-background);
 	}
 }
-	.app-content-list-item-star.icon-junk {
-		right: 7px;
-		top: 13px;
-		opacity: 1;
 
-		&:hover {
-			opacity: 0.5;
-		}
-	}
 .app-content-list-item.unseen {
 	font-weight: bold;
+}
+.app-content-list-item-star.notjunk {
+	background-image: var(--icon-junk-000);
+	opacity: 1;
 }
 .app-content-list-item.draft .app-content-list-item-line-two {
 	font-style: italic;

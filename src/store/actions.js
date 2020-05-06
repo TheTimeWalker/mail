@@ -540,6 +540,26 @@ export default {
 			})
 		})
 	},
+	toggleEnvelopeJunk({commit, getters}, envelope) {
+		// Change immediately and switch back on error
+		const oldState = envelope.flags.notjunk
+		commit('flagEnvelope', {
+			envelope,
+			flag: 'notjunk',
+			value: !oldState,
+		})
+
+		setEnvelopeFlag(envelope.accountId, envelope.folderId, envelope.id, 'notjunk', !oldState).catch((e) => {
+			console.error('could not toggle message junk state', e)
+
+			// Revert change
+			commit('flagEnvelope', {
+				envelope,
+				flag: 'notjunk',
+				value: oldState,
+			})
+		})
+	},
 	fetchMessage({commit}, uid) {
 		const {accountId, folderId, id} = parseUid(uid)
 		return fetchMessage(accountId, folderId, id).then((message) => {
