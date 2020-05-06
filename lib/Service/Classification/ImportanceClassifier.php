@@ -147,6 +147,11 @@ class ImportanceClassifier {
 		);
 		$validationSet = array_slice($dataSet, 0, $validationThreshold);
 		$trainingSet = array_slice($dataSet, $validationThreshold);
+		if (empty($validationSet) || empty($trainingSet)) {
+			$this->logger->warning('not enough messages to train a classifier');
+			$perf->end();
+			return;
+		}
 		$validationEstimator = $this->trainClassifier($trainingSet);
 		$classifier = $this->validateClassifier($validationEstimator, $trainingSet, $validationSet);
 		$perf->step("train and validate classifier with training and validation sets");
